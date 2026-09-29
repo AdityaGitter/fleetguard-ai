@@ -1,0 +1,56 @@
+{
+  "roc_auc": 0.9978337430003907,
+  "n_train_rows": 67500,
+  "n_test_rows": 22500,
+  "positive_rate": 0.021988888888888888,
+  "top_features": [
+    {
+      "name": "avg_battery_voltage",
+      "importance": 0.916508926747634
+    },
+    {
+      "name": "dtc_event_count",
+      "importance": 0.06005884987270434
+    },
+    {
+      "name": "odo_km",
+      "importance": 0.010803587034765812
+    },
+    {
+      "name": "harsh_brake_ct",
+      "importance": 0.006731111180848781
+    },
+    {
+      "name": "max_vibration_index_roll3",
+      "importance": 0.0020624566501861114
+    },
+    {
+      "name": "min_oil_life_pct_roll3",
+      "importance": 0.0015090567998185186
+    },
+    {
+      "name": "min_oil_life_pct",
+      "importance": 0.0005939030259552794
+    },
+    {
+      "name": "max_vibration_index",
+      "importance": 0.0005281039712628914
+    },
+    {
+      "name": "max_engine_temp_c",
+      "importance": 0.0005116157035614365
+    },
+    {
+      "name": "avg_speed_kmh",
+      "importance": 0.00023879854599140495
+    },
+    {
+      "name": "max_engine_temp_c_roll3",
+      "importance": 0.00023818038761238753
+    },
+    {
+      "name": "avg_battery_voltage_roll3",
+      "importance": 0.00021541007965904255
+    }
+  ]
+}

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Fleet Predictive Maintenance Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171d2c; --text: #e7ebf3; --muted: #8b93a7;
+    --low: #3ecf8e; --medium: #f5c451; --high: #f2994a; --critical: #ef5350;
+    --accent: #5b8cff;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 20px 28px; border-bottom: 1px solid #232a3d; display:flex; justify-content:space-between; align-items:center; }
+  header h1 { font-size: 18px; margin:0; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  main { padding: 24px 28px; max-width: 1100px; margin: 0 auto; }
+  .login { max-width: 360px; margin: 80px auto; background: var(--panel); padding: 28px; border-radius: 12px; }
+  .login input { width:100%; padding:10px; margin: 6px 0 14px; border-radius: 8px; border: 1px solid #2b3348; background:#101526; color: var(--text); }
+  .login button, .btn { background: var(--accent); color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 10px; overflow: hidden; }
+  th, td { padding: 12px 14px; text-align: left; font-size: 14px; border-bottom: 1px solid #232a3d; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .badge { padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .low { background: rgba(62,207,142,.15); color: var(--low); }
+  .medium { background: rgba(245,196,81,.15); color: var(--medium); }
+  .high { background: rgba(242,153,74,.15); color: var(--high); }
+  .critical { background: rgba(239,83,80,.15); color: var(--critical); }
+  .stat-row { display:flex; gap:16px; margin-bottom: 20px; }
+  .stat { background: var(--panel); padding: 16px 20px; border-radius: 10px; flex:1; }
+  .stat .n { font-size: 26px; font-weight: 700; }
+  .stat .l { color: var(--muted); font-size: 12px; text-transform: uppercase; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  #error { color: var(--critical); font-size: 13px; margin-top: 10px; }
+</style>
+</head>
+<body>
+
+<div id="login-view" class="login">
+  <h2>Fleet Sign In</h2>
+  <input id="email" placeholder="email" value="manager@fleet.demo">
+  <input id="password" type="password" placeholder="password" value="demo1234">
+  <button class="btn" onclick="login()">Sign in</button>
+  <div id="error"></div>
+  <p class="hint">Demo credentials seeded by <code>db/seed_demo_user.sql</code>. Configure API base URL below if not on localhost:8000.</p>
+  <input id="apiBase" placeholder="API base URL" value="http://localhost:8000">
+</div>
+
+<div id="app-view" style="display:none;">
+  <header>
+    <div>
+      <h1>Fleet Predictive Maintenance</h1>
+      <div class="sub">Connected Vehicle Intelligence — MVP dashboard</div>
+    </div>
+    <button class="btn" onclick="logout()">Sign out</button>
+  </header>
+  <main>
+    <div class="stat-row">
+      <div class="stat"><div class="n" id="statTotal">–</div><div class="l">Vehicles</div></div>
+      <div class="stat"><div class="n" id="statOpen">–</div><div class="l">Open Alerts</div></div>
+      <div class="stat"><div class="n" id="statCritical">–</div><div class="l">Critical Risk</div></div>
+    </div>
+    <table>
+      <thead>
+        <tr><th>VIN</th><th>Make / Model</th><th>Risk</th><th>Score</th><th>Top Factor</th><th></th></tr>
+      </thead>
+      <tbody id="fleetTable"></tbody>
+    </table>
+  </main>
+</div>
+
+<script>
+let token = null, apiBase = "http://localhost:8000";
+
+async function login() {
+  apiBase = document.getElementById('apiBase').value.trim();
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  document.getElementById('error').textContent = '';
+  try {
+    const res = await fetch(`${apiBase}/auth/token`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    if (!res.ok) throw new Error('Invalid credentials');
+    const data = await res.json();
+    token = data.access_token;
+    document.getElementById('login-view').style.display = 'none';
+    document.getElementById('app-view').style.display = 'block';
+    loadFleet();
+  } catch (e) {
+    document.getElementById('error').textContent = e.message;
+  }
+}
+
+function logout() {
+  token = null;
+  document.getElementById('login-view').style.display = 'block';
+  document.getElementById('app-view').style.display = 'none';
+}
+
+function riskBadge(band) {
+  return `<span class="badge ${band}">${band}</span>`;
+}
+
+async function api(path) {
+  const res = await fetch(`${apiBase}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
+
+async function loadFleet() {
+  try {
+    const vehicles = await api('/vehicles?limit=50');
+    const alerts = await api('/alerts?status=open&limit=200');
+
+    document.getElementById('statTotal').textContent = vehicles.items.length;
+    document.getElementById('statOpen').textContent = alerts.items.length;
+
+    const rows = [];
+    let criticalCount = 0;
+    for (const v of vehicles.items) {
+      let pred = null;
+      try { pred = await api(`/predictions/${v.vin}`); } catch (e) { /* no score yet */ }
+      const band = pred ? pred.risk_band : 'low';
+      if (band === 'critical') criticalCount++;
+      const topFactor = pred && pred.top_factors[0] ? pred.top_factors[0].feature : '–';
+      rows.push(`<tr>
+        <td><code>${v.vin}</code></td>
+        <td>${v.make} ${v.model} (${v.model_year})</td>
+        <td>${riskBadge(band)}</td>
+        <td>${pred ? (pred.risk_score * 100).toFixed(1) + '%' : '–'}</td>
+        <td>${topFactor}</td>
+        <td><button class="btn" onclick="ackDemo('${v.vin}')">Details</button></td>
+      </tr>`);
+    }
+    document.getElementById('statCritical').textContent = criticalCount;
+    document.getElementById('fleetTable').innerHTML = rows.join('');
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function ackDemo(vin) {
+  alert(`Vehicle detail view for ${vin} — wire up a drill-down page consuming
+GET /vehicles/${vin} + GET /predictions/${vin} + telemetry history here.`);
+}
+</script>
+</body>
+</html>
