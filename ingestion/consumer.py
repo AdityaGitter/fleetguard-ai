@@ -138,13 +138,17 @@ def run_kafka_loop(bootstrap: str, topic: str, dlq_topic: str):
     print(f"Consuming {topic} from {bootstrap} ...")
     for msg in consumer:
         handler.handle(msg.value)
+
         if handler.dead_letters:
             for dl in handler.dead_letters:
                 dlq_producer.send(dlq_topic, dl)
             handler.dead_letters.clear()
-        consumer.commit()  # commit only after durable write in handle()/flush()
 
+    # Flush any remaining events so small batches are persisted.
+        handler.flush()
 
+    # Commit only after the data has been durably written.
+        consumer.commit()
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--bootstrap", default="localhost:9092")
